@@ -1,0 +1,13 @@
+{
+  "name": "form-autofill-configurator",
+  "version": "1.0.0",
+  "description": "Client Web App for configuring Google Form Auto-Filler requirements",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  }
+}

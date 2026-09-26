@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Form Auto-Filler Configurator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #f8f9fa; color: #202124; padding: 24px; max-width: 760px; margin: 0 auto; }
+    header { margin-bottom: 20px; border-bottom: 1px solid #dadce0; padding-bottom: 12px; }
+    h1 { font-size: 22px; font-weight: 700; color: #1a73e8; display: flex; align-items: center; gap: 8px; }
+    p.subtitle { font-size: 14px; color: #5f6368; margin-top: 4px; }
+    
+    .card { background: #fff; border: 1px solid #dadce0; border-radius: 10px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .input-group { display: flex; gap: 10px; margin-top: 8px; }
+    input[type="url"], input[type="text"], input[type="number"], select, textarea {
+      padding: 8px 12px; border: 1px solid #dadce0; border-radius: 6px; font-size: 14px; outline: none; transition: border-color 0.2s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: #1a73e8; }
+    input[type="url"] { flex: 1; }
+    
+    button {
+      padding: 8px 16px; background: #1a73e8; color: #fff; font-weight: 600; border: none; border-radius: 6px; cursor: pointer; transition: background 0.2s; font-size: 14px;
+    }
+    button:hover { background: #1557b0; }
+    button.secondary { background: #f1f3f4; color: #3c4043; border: 1px solid #dadce0; }
+    button.secondary:hover { background: #e8eaed; }
+    
+    #loading { display: none; margin: 12px 0; font-size: 14px; color: #1a73e8; font-weight: 600; }
+    #formTitle { font-size: 16px; font-weight: 700; margin-bottom: 12px; color: #202124; display: none; }
+    
+    .field { background: #fff; border: 1px solid #dadce0; border-radius: 8px; padding: 14px; margin-bottom: 12px; }
+    .field-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .field-label { font-weight: 600; font-size: 14px; color: #202124; max-width: 75%; word-break: break-word; }
+    .field-type { font-size: 11px; color: #5f6368; background: #e8f0fe; padding: 3px 8px; border-radius: 4px; font-weight: 600; }
+    
+    .filler-select { width: 100%; margin-bottom: 8px; background: #fff; font-weight: 500; }
+    
+    .static-input-container { margin-top: 6px; }
+    .static-input-container input[type="text"],
+    .static-input-container textarea,
+    .static-input-container select { width: 100%; padding: 6px 8px; border: 1px solid #dadce0; border-radius: 4px; font-size: 13px; }
+    .static-input-container textarea { height: 50px; resize: vertical; }
+    .option-group label, .checkbox-list label { display: block; font-size: 13px; padding: 4px 0; cursor: pointer; color: #3c4043; }
+    .option-group input, .checkbox-list input { margin-right: 6px; }
+    .date-group, .time-group { display: flex; gap: 6px; }
+    .date-group input, .time-group input { flex: 1; padding: 5px; border: 1px solid #dadce0; border-radius: 4px; font-size: 13px; }
+
+    .section-header { background: #e8f0fe; color: #1a73e8; font-weight: 700; font-size: 13px; padding: 8px 12px; border-radius: 6px; margin: 14px 0 8px 0; border-left: 4px solid #1a73e8; word-break: break-word; }
+
+    .config-panel { background: #f1f3f4; border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px; margin-top: 6px; display: none; }
+    .config-panel.active { display: block; }
+    .config-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+    .config-row label { font-size: 13px; color: #3c4043; min-width: 80px; }
+    .config-hint { font-size: 11px; color: #5f6368; margin-top: 4px; }
+    
+    .weights-list { max-height: 200px; overflow-y: auto; margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+    .weight-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #fff; padding: 6px 8px; border-radius: 4px; border: 1px solid #dadce0; }
+    .weight-label { font-size: 13px; color: #202124; flex: 1; word-break: break-word; }
+    .weight-input { width: 65px; padding: 4px 6px; border: 1px solid #dadce0; border-radius: 4px; font-size: 13px; text-align: right; }
+    
+    .global-controls { display: flex; gap: 16px; margin-top: 12px; }
+    .global-control-item { flex: 1; }
+    .global-control-item label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    .global-control-item input { width: 100%; }
+    
+    .action-bar { display: flex; gap: 10px; margin-top: 16px; }
+    .toast { position: fixed; bottom: 20px; right: 20px; background: #323232; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+    .toast.show { opacity: 1; }
+    
+    .fallback-box { margin-top: 10px; border-top: 1px dashed #dadce0; padding-top: 10px; font-size: 12px; color: #5f6368; }
+    .toggle-link { color: #1a73e8; cursor: pointer; text-decoration: underline; font-size: 12px; margin-top: 6px; display: inline-block; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📝 Form Auto-Filler Configurator</h1>
+    <p class="subtitle">Configure form response rules for your client and export a JSON file for the Chrome Extension.</p>
+  </header>
+
+  <div class="card">
+    <label style="font-weight: 600; font-size: 14px;">1. Paste Google Form URL:</label>
+    <div class="input-group">
+      <input type="url" id="formUrl" placeholder="https://docs.google.com/forms/d/e/.../viewform" />
+      <button id="fetchBtn">Fetch Questions</button>
+    </div>
+    <div id="loading">⏳ Fetching form structure...</div>
+
+    <div class="toggle-link" id="togglePasteBtn">Or paste Form HTML source code manually</div>
+
+    <div id="pasteSection" style="display: none;" class="fallback-box">
+      <label style="display:block; font-weight: 600; margin-bottom: 4px;">Paste raw Page HTML Source:</label>
+      <textarea id="rawHtmlText" style="width: 100%; height: 80px;" placeholder="Right click form -> View Page Source -> Copy all text and paste here"></textarea>
+      <button id="parseHtmlBtn" style="margin-top: 6px;" class="secondary">Parse HTML Source</button>
+    </div>
+  </div>
+
+  <div id="editorSection" style="display: none;">
+    <h2 id="formTitle">Form Title</h2>
+    <div id="fieldsContainer"></div>
+
+    <div class="card">
+      <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 8px;">2. Submission Settings</h3>
+      <div class="global-controls">
+        <div class="global-control-item">
+          <label>Total Repeat Submissions:</label>
+          <input type="number" id="repeatCount" min="1" value="10" />
+        </div>
+        <div class="global-control-item">
+          <label>Delay Between Submissions (ms):</label>
+          <input type="number" id="delayMs" min="500" step="500" value="2000" />
+        </div>
+      </div>
+      
+      <div class="action-bar">
+        <button id="exportJsonBtn">📥 Export JSON Config File</button>
+        <button id="copyJsonBtn" class="secondary">📋 Copy JSON to Clipboard</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    let loadedFields = [];
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    document.getElementById('togglePasteBtn').addEventListener('click', () => {
+      const box = document.getElementById('pasteSection');
+      box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    });
+
+    document.getElementById('fetchBtn').addEventListener('click', async () => {
+      const url = document.getElementById('formUrl').value.trim();
+      if (!url) return alert('Please enter a Google Form URL.');
+      
+      const loading = document.getElementById('loading');
+      loading.style.display = 'block';
+      document.getElementById('editorSection').style.display = 'none';
+
+      try {
+        const res = await fetch('/api/fetch-form', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+        const data = await res.json();
+        loading.style.display = 'none';
+
+        if (!data.success) {
+          return alert(data.error || 'Failed to fetch form.');
+        }
+
+        loadedFields = data.fields || [];
+        document.getElementById('formTitle').textContent = '📋 ' + data.title;
+        document.getElementById('formTitle').style.display = 'block';
+        renderFields(loadedFields);
+        document.getElementById('editorSection').style.display = 'block';
+      } catch (err) {
+        loading.style.display = 'none';
+        alert('Server unreachable. Please run "python server.py" or use "Paste Form HTML source code" below.');
+      }
+    });
+
+    document.getElementById('parseHtmlBtn').addEventListener('click', () => {
+      const html = document.getElementById('rawHtmlText').value;
+      if (!html) return alert('Please paste HTML content first.');
+
+      const startIdx = html.indexOf('FB_PUBLIC_LOAD_DATA_');
+      if (startIdx === -1) return alert('Could not find FB_PUBLIC_LOAD_DATA_ in the pasted HTML.');
+
+      const arrayStart = html.indexOf('[', startIdx);
+      const arrayEnd = html.lastIndexOf(']');
+      if (arrayStart === -1 || arrayEnd === -1) return alert('Invalid form structure.');
+
+      try {
+        const jsonStr = html.substring(arrayStart, arrayEnd + 1);
+        const formData = JSON.parse(jsonStr);
+        const fields = parseFromLoadData(formData);
+        const title = (formData[1] && formData[1][8]) || (formData[1] && formData[1][0]) || 'Google Form';
+
+        loadedFields = fields;
+        document.getElementById('formTitle').textContent = '📋 ' + title;
+        document.getElementById('formTitle').style.display = 'block';
+        renderFields(loadedFields);
+        document.getElementById('editorSection').style.display = 'block';
+      } catch (e) {
+        alert('Failed to parse pasted HTML: ' + e.message);
+      }
+    });
+
+    function extractOptions(rawOptions) {
+      const options = [];
+      if (!Array.isArray(rawOptions)) return options;
+      rawOptions.forEach((opt) => {
+        if (Array.isArray(opt) && opt.length > 0) {
+          const val = (opt[0] !== null && opt[0] !== undefined) ? String(opt[0]) : '';
+          options.push({ value: val, label: val });
+        } else if (typeof opt === 'string' || typeof opt === 'number') {
+          const val = String(opt);
+          options.push({ value: val, label: val });
+        }
+      });
+      return options;
+    }
+
+    function parseFromLoadData(formData) {
+      const fields = [];
+      try {
+        const questions = formData[1][1];
+        if (!Array.isArray(questions)) return fields;
+
+        const formTitle = (formData[1] && (formData[1][8] || formData[1][0])) || '';
+        let sectionCount = 1;
+        let currentSection = formTitle ? `Section 1: ${formTitle}` : 'Section 1';
+
+        questions.forEach((q) => {
+          if (!Array.isArray(q)) return;
+          const label = (q[1] || '').trim();
+          const questionType = q[3];
+          const subEntries = q[4] || [];
+
+          if (questionType === 6 || questionType === 11 || (subEntries.length === 0 && label)) {
+            sectionCount++;
+            currentSection = label ? `Section ${sectionCount}: ${label}` : `Section ${sectionCount}`;
+            return;
+          }
+
+          if (subEntries.length === 0) return;
+          const rawOptions = subEntries[0][1];
+
+          switch (questionType) {
+            case 0: fields.push({ name: 'entry.' + subEntries[0][0], label, type: 'text', section: currentSection }); break;
+            case 1: fields.push({ name: 'entry.' + subEntries[0][0], label, type: 'textarea', section: currentSection }); break;
+            case 2: fields.push({ name: 'entry.' + subEntries[0][0], label, type: 'radio', options: extractOptions(rawOptions), section: currentSection }); break;
+            case 3: fields.push({ name: 'entry.' + subEntries[0][0], label, type: 'select', options: extractOptions(rawOptions), section: currentSection }); break;
+            case 4: fields.push({ name: 'entry.' + subEntries[0][0], label, type: 'checkbox', options: extractOptions(rawOptions), section: currentSection }); break;
+            case 5:
+            case 18: fields.push({ name: 'entry.' + subEntries[0][0], label, type: 'linear', options: extractOptions(rawOptions), section: currentSection }); break;
+            case 7:
+            case 8: {
+              const colOptions = extractOptions(subEntries[0][1]);
+              subEntries.forEach((se, idx) => {
+                fields.push({
+                  name: 'entry.' + se[0],
+                  label: label + ' [' + (se[3] ? se[3][0] : `Row ${idx + 1}`) + ']',
+                  type: questionType === 7 ? 'radio' : 'checkbox',
+                  options: colOptions,
+                  isGrid: true,
+                  section: currentSection
+                });
+              });
+              break;
+            }
+            case 9: fields.push({ name: 'entry.' + subEntries[0][0], label, type: 'date', section: currentSection }); break;
+            case 10: fields.push({ name: 'entry.' + subEntries[0][0], label, type: 'time', section: currentSection }); break;
+            default: fields.push({ name: 'entry.' + subEntries[0][0], label, type: 'text', section: currentSection });
+          }
+        });
+      } catch (e) {
+        console.error('Error parsing FB_PUBLIC_LOAD_DATA_:', e);
+      }
+      return fields;
+    }
+
+    function renderStaticInput(container, field) {
+      switch (field.type) {
+        case 'text': {
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.placeholder = 'Static text value';
+          container.appendChild(input);
+          break;
+        }
+        case 'textarea': {
+          const ta = document.createElement('textarea');
+          ta.placeholder = 'Static paragraph value';
+          container.appendChild(ta);
+          break;
+        }
+        case 'radio':
+        case 'linear': {
+          const group = document.createElement('div');
+          group.className = 'option-group';
+          (field.options || []).forEach((opt, idx) => {
+            const lbl = document.createElement('label');
+            const radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = 'static_' + field.name;
+            radio.value = opt.value;
+            if (idx === 0) radio.checked = true;
+            lbl.appendChild(radio);
+            lbl.appendChild(document.createTextNode(' ' + opt.label));
+            group.appendChild(lbl);
+          });
+          container.appendChild(group);
+          break;
+        }
+        case 'select': {
+          const sel = document.createElement('select');
+          (field.options || []).forEach((opt) => {
+            const o = document.createElement('option');
+            o.value = opt.value;
+            o.textContent = opt.label;
+            sel.appendChild(o);
+          });
+          container.appendChild(sel);
+          break;
+        }
+        case 'checkbox': {
+          const group = document.createElement('div');
+          group.className = 'checkbox-list';
+          (field.options || []).forEach((opt) => {
+            const lbl = document.createElement('label');
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = opt.value;
+            lbl.appendChild(cb);
+            lbl.appendChild(document.createTextNode(' ' + opt.label));
+            group.appendChild(lbl);
+          });
+          container.appendChild(group);
+          break;
+        }
+        case 'date': {
+          const group = document.createElement('div');
+          group.className = 'date-group';
+          ['Year', 'Month', 'Day'].forEach((part) => {
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.placeholder = part;
+            input.dataset.datePart = part.toLowerCase();
+            if (part === 'Year') { input.value = new Date().getFullYear(); }
+            if (part === 'Month') { input.value = new Date().getMonth() + 1; }
+            if (part === 'Day') { input.value = new Date().getDate(); }
+            group.appendChild(input);
+          });
+          container.appendChild(group);
+          break;
+        }
+        case 'time': {
+          const group = document.createElement('div');
+          group.className = 'time-group';
+          ['Hour', 'Minute'].forEach((part) => {
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.placeholder = part;
+            input.dataset.timePart = part.toLowerCase();
+            if (part === 'Hour') { input.value = 12; }
+            if (part === 'Minute') { input.value = 0; }
+            group.appendChild(input);
+          });
+          container.appendChild(group);
+          break;
+        }
+      }
+    }
+
+    function renderFields(fields) {
+      const container = document.getElementById('fieldsContainer');
+      container.innerHTML = '';
+
+      let lastSection = null;
+      fields.forEach((field) => {
+        if (field.section && field.section !== lastSection) {
+          lastSection = field.section;
+          const sectionDiv = document.createElement('div');
+          sectionDiv.className = 'section-header';
+          sectionDiv.textContent = '📁 ' + field.section;
+          container.appendChild(sectionDiv);
+        }
+        const div = document.createElement('div');
+        div.className = 'field';
+        div.dataset.fieldName = field.name;
+        div.dataset.fieldType = field.type;
+
+        const header = document.createElement('div');
+        header.className = 'field-header';
+        const label = document.createElement('div');
+        label.className = 'field-label';
+        label.textContent = field.label;
+        header.appendChild(label);
+
+        const typeBadge = document.createElement('span');
+        typeBadge.className = 'field-type';
+        typeBadge.textContent = field.type.toUpperCase();
+        header.appendChild(typeBadge);
+        div.appendChild(header);
+
+        const select = document.createElement('select');
+        select.className = 'filler-select';
+
+        if (field.type === 'text' || field.type === 'textarea') {
+          select.innerHTML = `
+            <option value="static">Static Value</option>
+            <option value="custom_list">Custom List (Random)</option>
+            <option value="custom_list_seq">Custom List (Line-by-line)</option>
+            <option value="malaysian_name">Random Malaysian Name</option>
+            <option value="random_number">Random Number Range</option>
+            <option value="random_email">Random Email</option>
+          `;
+        } else if (field.type === 'checkbox') {
+          select.innerHTML = `
+            <option value="random_select">Random Single Choice</option>
+            <option value="weighted_select">Weighted Choice (% Chance)</option>
+            <option value="random_checkbox">Random Multi-Choice Range</option>
+            <option value="static">Static Choices</option>
+          `;
+        } else {
+          select.innerHTML = `
+            <option value="random_select">Random Choice</option>
+            <option value="weighted_select">Weighted Choice (% Chance)</option>
+            <option value="static">Static Choice</option>
+          `;
+        }
+        div.appendChild(select);
+
+        const staticPanel = document.createElement('div');
+        staticPanel.className = 'static-input-container';
+        renderStaticInput(staticPanel, field);
+        if (select.value !== 'static') {
+          staticPanel.style.display = 'none';
+        }
+        div.appendChild(staticPanel);
+
+        const genPanel = document.createElement('div');
+        genPanel.className = 'config-panel';
+        div.appendChild(genPanel);
+
+        select.addEventListener('change', () => {
+          const mode = select.value;
+          staticPanel.style.display = 'none';
+          genPanel.style.display = 'none';
+          genPanel.classList.remove('active');
+          genPanel.innerHTML = '';
+
+          if (mode === 'static') {
+            staticPanel.style.display = 'block';
+          } else if (mode === 'custom_list' || mode === 'custom_list_seq') {
+            genPanel.style.display = 'block';
+            genPanel.classList.add('active');
+            const isSeq = mode === 'custom_list_seq';
+            genPanel.innerHTML = `
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <label style="font-size: 12px; font-weight: 600;">Custom inputs (one per line):</label>
+                <textarea class="custom-list-textarea" style="width:100%; height:70px;" placeholder="Input 1&#10;Input 2&#10;Input 3"></textarea>
+                <div class="config-hint">${isSeq ? 'Submissions will pick inputs in order line-by-line.' : 'Each submission will randomly pick an input from this list.'}</div>
+              </div>
+            `;
+          } else if (mode === 'weighted_select') {
+            genPanel.style.display = 'block';
+            genPanel.classList.add('active');
+            renderWeightedPanel(genPanel, field);
+          } else if (mode === 'random_number') {
+            genPanel.style.display = 'block';
+            genPanel.classList.add('active');
+            genPanel.innerHTML = `
+              <div class="config-row">
+                <label>Min:</label>
+                <input type="number" class="range-min" value="18" />
+              </div>
+              <div class="config-row">
+                <label>Max:</label>
+                <input type="number" class="range-max" value="60" />
+              </div>
+            `;
+          }
+        });
+
+        container.appendChild(div);
+      });
+    }
+
+    function renderWeightedPanel(genPanel, field) {
+      const options = field.options || [];
+      if (options.length === 0) {
+        genPanel.innerHTML = '<div style="font-size:12px;color:#888;">No choices detected.</div>';
+        return;
+      }
+      let html = `<div class="weights-list">`;
+      options.forEach((opt) => {
+        html += `
+          <div class="weight-row">
+            <span class="weight-label">${opt.label}</span>
+            <div style="display:flex; align-items:center; gap:4px;">
+              <input type="number" class="weight-input" data-option-value="${encodeURIComponent(opt.value)}" min="0" value="1" />
+            </div>
+          </div>
+        `;
+      });
+      html += `</div>`;
+      genPanel.innerHTML = html;
+    }
+
+    function collectConfig() {
+      const rules = {};
+      document.querySelectorAll('.field').forEach((fieldDiv) => {
+        const name = fieldDiv.dataset.fieldName;
+        const type = fieldDiv.dataset.fieldType;
+        const select = fieldDiv.querySelector('.filler-select');
+        const mode = select ? select.value : 'static';
+
+        const rule = { mode };
+
+        if (mode === 'static') {
+          if (type === 'text') {
+            const inp = fieldDiv.querySelector('.static-input-container input[type="text"]');
+            rule.value = inp ? inp.value.trim() : '';
+          } else if (type === 'textarea') {
+            const ta = fieldDiv.querySelector('.static-input-container textarea');
+            rule.value = ta ? ta.value.trim() : '';
+          } else if (type === 'radio' || type === 'linear') {
+            const checked = fieldDiv.querySelector('.static-input-container input[type="radio"]:checked');
+            rule.value = checked ? checked.value : '';
+          } else if (type === 'select') {
+            const sel = fieldDiv.querySelector('.static-input-container select');
+            rule.value = sel ? sel.value : '';
+          } else if (type === 'checkbox') {
+            const checked = fieldDiv.querySelectorAll('.static-input-container input[type="checkbox"]:checked');
+            rule.value = Array.from(checked).map((cb) => cb.value);
+          } else if (type === 'date') {
+            const yr = fieldDiv.querySelector('[data-date-part="year"]')?.value;
+            const mo = fieldDiv.querySelector('[data-date-part="month"]')?.value;
+            const dy = fieldDiv.querySelector('[data-date-part="day"]')?.value;
+            rule.value = { year: yr, month: mo, day: dy };
+          } else if (type === 'time') {
+            const hr = fieldDiv.querySelector('[data-time-part="hour"]')?.value;
+            const min = fieldDiv.querySelector('[data-time-part="minute"]')?.value;
+            rule.value = { hour: hr, minute: min };
+          }
+        } else if (mode === 'custom_list' || mode === 'custom_list_seq') {
+          const ta = fieldDiv.querySelector('.custom-list-textarea');
+          const rawText = ta ? ta.value : '';
+          rule.customList = rawText.split('\n').map(s => s.trim()).filter(Boolean);
+        } else if (mode === 'weighted_select') {
+          const weights = {};
+          fieldDiv.querySelectorAll('.weight-input').forEach(inp => {
+            const val = decodeURIComponent(inp.dataset.optionValue);
+            const weight = parseFloat(inp.value) || 0;
+            weights[val] = Math.max(0, weight);
+          });
+          rule.weights = weights;
+        } else if (mode === 'random_number') {
+          const minVal = fieldDiv.querySelector('.range-min')?.value;
+          const maxVal = fieldDiv.querySelector('.range-max')?.value;
+          rule.min = parseInt(minVal, 10) || 0;
+          rule.max = parseInt(maxVal, 10) || 100;
+        }
+
+        rules[name] = rule;
+      });
+
+      const repeatCount = parseInt(document.getElementById('repeatCount').value, 10) || 1;
+      const delayMs = parseInt(document.getElementById('delayMs').value, 10) || 2000;
+
+      return {
+        version: "1.0",
+        formUrl: document.getElementById('formUrl').value.trim(),
+        createdAt: new Date().toISOString(),
+        repeatCount,
+        delayMs,
+        rules
+      };
+    }
+
+    document.getElementById('exportJsonBtn').addEventListener('click', () => {
+      const config = collectConfig();
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(config, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", "form_autofill_config.json");
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast('📥 JSON configuration downloaded!');
+    });
+
+    document.getElementById('copyJsonBtn').addEventListener('click', () => {
+      const config = collectConfig();
+      const str = JSON.stringify(config, null, 2);
+      navigator.clipboard.writeText(str).then(() => {
+        showToast('📋 JSON copied to clipboard!');
+      });
+    });
+  </script>
+</body>
+</html>
